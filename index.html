@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Alimentation et sport</title>
+  <meta name="description" content="Estimez votre dépense énergétique quotidienne et trouvez le programme sportif adapté à votre objectif.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230d7a58'/%3E%3Cpath d='M16 7c3 4 6 7 6 11a6 6 0 0 1-12 0c0-2 1-4 2-5 0 2 1 3 2 3 0-3 1-6 2-9z' fill='%23fff'/%3E%3C/svg%3E">
+  <style>
+    /* Mise en page : deux vues (calculateur, programme) dans le même fichier.
+       Dans chaque vue, formulaire à gauche et résultats à droite, empilés sur mobile. */
+    :root {
+      --bg: #f3f6f4;
+      --surface: #ffffff;
+      --ink: #15211c;
+      --muted: #56665e;
+      --line: #d8e0db;
+      --accent: #0d7a58;      /* contrôles, sélection, navigation */
+      --on-accent: #ffffff;   /* texte posé sur l'accent */
+      --energy: #d24e29;      /* chiffres d'énergie */
+      --loss: #2d6ab3;        /* objectif perte de poids */
+      --danger: #b3261e;      /* erreurs de saisie */
+      --font-display: "Avenir Next", Avenir, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+      --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --radius: 14px;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0e1513;
+        --surface: #16201c;
+        --ink: #e5ece8;
+        --muted: #9aaaa2;
+        --line: #2a3732;
+        --accent: #3cc794;
+        --on-accent: #06140e;
+        --energy: #ff7d55;
+        --loss: #74a8ec;
+        --danger: #ff8a80;
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #0e1513;
+      --surface: #16201c;
+      --ink: #e5ece8;
+      --muted: #9aaaa2;
+      --line: #2a3732;
+      --accent: #3cc794;
+      --on-accent: #06140e;
+      --energy: #ff7d55;
+      --loss: #74a8ec;
+      --danger: #ff8a80;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+    p { margin: 0; }
+    a { color: var(--accent); }
+
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 28px 20px 56px;
+      display: grid;
+      gap: 32px;
+    }
+    .view { display: grid; gap: 32px; }
+
+    /* En-tête et navigation */
+    .site-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 24px;
+    }
+    .brand {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+    .tabs a {
+      text-decoration: none;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.92rem;
+      padding: 8px 14px;
+      border-radius: 9px;
+    }
+    .tabs a:hover:not([aria-current]) { color: var(--ink); }
+    .tabs a[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+    .tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .intro { display: grid; gap: 10px; }
+    h1 {
+      font-size: clamp(1.8rem, 1.2rem + 2.2vw, 2.6rem);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+    .lede { color: var(--muted); max-width: 62ch; font-size: 1.05rem; }
+
+    /* Grille principale */
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+      gap: 24px;
+      align-items: start;
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .panel-head { display: grid; gap: 6px; }
+    .panel h2 { font-size: 1.25rem; letter-spacing: -0.01em; }
+    .hint { color: var(--muted); font-size: 0.9rem; }
+
+    /* Formulaires */
+    .form { display: grid; gap: 22px; }
+    fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 10px; }
+    legend { font-weight: 650; font-size: 0.95rem; padding: 0; margin-bottom: 10px; }
+    legend .hint { font-weight: 400; font-size: 0.85rem; }
+
+    .segmented {
+      position: relative;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      gap: 4px;
+      padding: 4px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+    .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+    .segmented label {
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 9px 6px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.92rem;
+      line-height: 1.25;
+      color: var(--muted);
+    }
+    .segmented input:checked + label {
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: 0 0 0 1px var(--line), 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+    .segmented input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+      gap: 12px;
+    }
+    .field { display: grid; gap: 6px; align-content: start; min-width: 0; }
+    .field label { font-weight: 650; font-size: 0.95rem; }
+    .field .hint { font-size: 0.82rem; }
+    .input {
+      display: flex;
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .input input {
+      flex: 1;
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-variant-numeric: tabular-nums;
+      padding: 10px 0 10px 12px;
+    }
+    .input input:focus { outline: none; }
+    .input span { color: var(--muted); font-size: 0.9rem; padding: 0 12px 0 6px; }
+    .input:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+    }
+    .input.invalide { border-color: var(--danger); }
+
+    .choices { display: grid; gap: 8px; }
+    .choice {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .choice:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+    .choice:has(input:checked) {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    }
+    .choice:has(input:disabled) { opacity: 0.55; cursor: not-allowed; }
+    .choice:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .choice input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
+    .choice-title { display: block; font-weight: 600; }
+    .choice-desc { display: block; color: var(--muted); font-size: 0.86rem; }
+    .choice-side {
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .picks { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pick { position: relative; }
+    .pick input { position: absolute; opacity: 0; pointer-events: none; }
+    .pick span {
+      display: inline-block;
+      padding: 7px 13px;
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      background: var(--surface);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .pick span:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+    .pick input:checked + span {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+    }
+    .pick input:checked + span::before { content: "✓ "; }
+    .pick input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .btn {
+      font: inherit;
+      font-weight: 650;
+      color: var(--on-accent);
+      background: var(--accent);
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 18px;
+      cursor: pointer;
+    }
+    .btn:hover { background: color-mix(in srgb, var(--accent) 88%, #000); }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+    /* Résultats du calculateur */
+    .results { display: grid; gap: 22px; position: sticky; top: 20px; }
+    .alert {
+      border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+      background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.92rem;
+    }
+    .alert ul { margin: 6px 0 0; padding-left: 18px; }
+    .res-body { display: grid; gap: 22px; transition: opacity 0.2s; }
+    .res-body.perime { opacity: 0.35; }
+
+    .headline { display: grid; gap: 4px; }
+    .res-label { font-weight: 600; color: var(--muted); font-size: 0.92rem; }
+    .big {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 4px 10px;
+      font-family: var(--font-display);
+      font-size: clamp(2.6rem, 2rem + 2.4vw, 3.4rem);
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: var(--energy);
+      font-variant-numeric: tabular-nums;
+    }
+    .big .unit { font-size: 1rem; font-weight: 600; letter-spacing: 0; color: var(--muted); }
+    .res-sub { color: var(--muted); }
+    .res-sub strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+    .split { display: grid; gap: 8px; }
+    .bar {
+      display: flex;
+      height: 10px;
+      border-radius: 99px;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--energy) 28%, var(--surface));
+    }
+    .bar-bmr { background: var(--energy); width: 65%; transition: width 0.3s ease; }
+    .bar-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.86rem; color: var(--muted); }
+    .bar-legend b { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+    .dot-bmr { background: var(--energy); }
+    .dot-act { background: color-mix(in srgb, var(--energy) 28%, var(--surface)); }
+
+    .results h3 { font-size: 1rem; margin-bottom: 10px; }
+    .goals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .goal {
+      display: grid;
+      gap: 4px;
+      align-content: start;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--goal, var(--muted));
+      border-radius: 10px;
+    }
+    .goal-loss { --goal: var(--loss); }
+    .goal-keep { --goal: var(--muted); }
+    .goal-gain { --goal: var(--energy); }
+    .goal-name { font-weight: 650; font-size: 0.92rem; }
+    .goal-value {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+    }
+    .goal-value small { font-family: var(--font-body); font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+    .goal-value.texte { font-size: 1.05rem; }
+    .goal-note { font-size: 0.82rem; color: var(--muted); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+    th { font-size: 0.8rem; font-weight: 650; color: var(--muted); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    tr.courant td { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); font-weight: 650; }
+    .chip {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 1px 8px;
+      border-radius: 99px;
+      font-size: 0.74rem;
+      font-weight: 650;
+      color: var(--accent);
+      border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+
+    .cta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .cta:hover { border-color: var(--accent); }
+    .cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .cta small { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+    .cta b { font-weight: 650; }
+    .cta .fleche { color: var(--accent); font-size: 1.3rem; font-weight: 700; }
+
+    /* Recommandation de programme */
+    .reco-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+    .match {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .panel .reco-nom { font-size: clamp(1.5rem, 1.2rem + 1vw, 1.9rem); line-height: 1.15; letter-spacing: -0.02em; }
+    .reco-resume { color: var(--muted); }
+    .facts {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .facts li { display: grid; gap: 2px; align-content: start; background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+    .facts span { font-size: 0.76rem; font-weight: 650; color: var(--muted); }
+    .facts b { font-size: 0.92rem; font-weight: 650; }
+    .checks, .warns { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.93rem; }
+    .checks li, .warns li { position: relative; padding-left: 24px; }
+    .checks li::before { content: "✓"; position: absolute; left: 2px; color: var(--accent); font-weight: 700; }
+    .warns li::before { content: "!"; position: absolute; left: 6px; color: var(--energy); font-weight: 800; }
+    .semaine { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+    .semaine li { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; }
+    .semaine b { display: block; font-size: 0.92rem; }
+    .semaine span { display: block; color: var(--muted); font-size: 0.9rem; }
+    .nutri {
+      display: grid;
+      gap: 6px;
+      padding: 14px 16px;
+      border: 1px solid color-mix(in srgb, var(--energy) 30%, var(--line));
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--energy) 6%, var(--surface));
+      font-size: 0.93rem;
+    }
+    .nutri-titre { font-weight: 650; font-size: 0.85rem; color: var(--energy); }
+    .nutri strong { font-variant-numeric: tabular-nums; }
+    .nutri a { font-weight: 600; font-size: 0.88rem; }
+
+    .catalogue { display: grid; gap: 14px; }
+    .catalogue h2 { font-size: 1.35rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .prog-card {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+    .prog-card.exclu { opacity: 0.6; }
+    .prog-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .prog-top h3 { font-size: 1.02rem; }
+    .meter { height: 6px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+    .meter span { display: block; height: 100%; background: var(--accent); }
+    .prog-resume { color: var(--muted); font-size: 0.9rem; }
+    .prog-facts { font-size: 0.84rem; font-weight: 600; }
+    .prog-limite { font-size: 0.84rem; color: var(--energy); }
+    details summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 0.9rem; }
+    details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    details .semaine { margin-top: 10px; }
+
+    /* Méthode */
+    .method { display: grid; gap: 14px; }
+    .method h2 { font-size: 1.35rem; }
+    .method > p { max-width: 68ch; color: var(--muted); }
+    .formulas { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+    .formula {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+    .formula h3 { font-size: 1rem; }
+    .formula p { color: var(--muted); font-size: 0.9rem; }
+    .formula code {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .note { font-size: 0.86rem; color: var(--muted); }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      display: grid;
+      gap: 6px;
+      max-width: 80ch;
+    }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .results { position: static; }
+    }
+    @media (max-width: 560px) {
+      .wrap { padding: 20px 16px 40px; }
+      .panel { padding: 18px; }
+      .goals { grid-template-columns: 1fr; }
+      .tabs { width: 100%; }
+      .tabs a { flex: 1; text-align: center; padding: 8px 6px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bar-bmr, .res-body { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <header class="site-header">
+      <a class="brand" href="#calculateur">Alimentation et sport</a>
+      <nav class="tabs" aria-label="Pages du site">
+        <a href="#calculateur" id="nav-calculateur">Dépense énergétique</a>
+        <a href="#programme" id="nav-programme">Programme sportif</a>
+      </nav>
+    </header>
+
+    <!-- =====================================================
+         PAGE 1 : CALCULATEUR DE DÉPENSE ÉNERGÉTIQUE
+         ===================================================== -->
+    <div class="view" id="vue-calculateur">
+      <div class="intro">
+        <h1>Calculez votre dépense énergétique</h1>
+        <p class="lede">Estimez l’énergie que votre corps dépense chaque jour, puis l’apport calorique qui correspond à votre objectif.</p>
+      </div>
+
+      <main class="layout">
+        <form class="panel form" id="calc" novalidate>
+          <div class="panel-head">
+            <h2>Vos informations</h2>
+            <p class="hint">Valeurs d’exemple pré-remplies&nbsp;: remplacez-les par les vôtres, le résultat se met à jour à chaque saisie.</p>
+          </div>
+
+          <fieldset>
+            <legend>Sexe</legend>
+            <div class="segmented">
+              <input type="radio" name="sexe" id="sexe-h" value="h" checked>
+              <label for="sexe-h">Homme</label>
+              <input type="radio" name="sexe" id="sexe-f" value="f">
+              <label for="sexe-f">Femme</label>
+            </div>
+          </fieldset>
+
+          <div class="fields">
+            <div class="field">
+              <label for="age">Âge</label>
+              <div class="input"><input id="age" name="age" type="number" inputmode="numeric" min="18" max="100" step="1" value="30"><span>ans</span></div>
+            </div>
+            <div class="field">
+              <label for="poids">Poids</label>
+              <div class="input"><input id="poids" name="poids" type="number" inputmode="decimal" min="30" max="300" step="0.1" value="75"><span>kg</span></div>
+            </div>
+            <div class="field">
+              <label for="taille">Taille</label>
+              <div class="input"><input id="taille" name="taille" type="number" inputmode="numeric" min="120" max="230" step="1" value="178"><span>cm</span></div>
+            </div>
+          </div>
+
+          <fieldset>
+            <legend>Niveau d’activité</legend>
+            <div class="choices">
+              <label class="choice">
+                <input type="radio" name="activite" id="act-1" value="1.2">
+                <span><span class="choice-title">Sédentaire</span><span class="choice-desc">Travail assis, peu ou pas de sport</span></span>
+                <span class="choice-side">×&nbsp;1,2</span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="activite" id="act-2" value="1.375">
+                <span><span class="choice-title">Légèrement actif</span><span class="choice-desc">Sport léger 1 à 3 fois par semaine</span></span>
+                <span class="choice-side">×&nbsp;1,375</span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="activite" id="act-3" value="1.55" checked>
+                <span><span class="choice-title">Modérément actif</span><span class="choice-desc">Sport modéré 3 à 5 fois par semaine</span></span>
+                <span class="choice-side">×&nbsp;1,55</span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="activite" id="act-4" value="1.725">
+                <span><span class="choice-title">Très actif</span><span class="choice-desc">Sport intense 6 à 7 fois par semaine</span></span>
+                <span class="choice-side">×&nbsp;1,725</span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="activite" id="act-5" value="1.9">
+                <span><span class="choice-title">Extrêmement actif</span><span class="choice-desc">Entraînement quotidien intense ou métier physique</span></span>
+                <span class="choice-side">×&nbsp;1,9</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Formule du métabolisme de base</legend>
+            <div class="choices">
+              <label class="choice">
+                <input type="radio" name="formule" id="f-mifflin" value="mifflin" checked>
+                <span><span class="choice-title">Mifflin-St Jeor</span><span class="choice-desc">Recommandée pour la plupart des adultes</span></span>
+                <span class="choice-side" id="bmr-mifflin">1&#8239;718 kcal</span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="formule" id="f-harris" value="harris">
+                <span><span class="choice-title">Harris-Benedict révisée</span><span class="choice-desc">La formule historique, révisée en 1984</span></span>
+                <span class="choice-side" id="bmr-harris">1&#8239;777 kcal</span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="formule" id="f-katch" value="katch" disabled>
+                <span><span class="choice-title">Katch-McArdle</span><span class="choice-desc">Pour qui connaît sa masse grasse</span></span>
+                <span class="choice-side" id="bmr-katch">masse grasse requise</span>
+              </label>
+            </div>
+            <div class="field">
+              <label for="mg">Masse grasse (facultatif)</label>
+              <div class="input"><input id="mg" name="mg" type="number" inputmode="decimal" min="3" max="60" step="0.1" placeholder="ex. 18"><span>%</span></div>
+              <p class="hint">Mesurée par impédancemètre ou pince à plis. Elle active la formule Katch-McArdle.</p>
+            </div>
+          </fieldset>
+
+          <button type="submit" class="btn" id="calculer">Calculer</button>
+        </form>
+
+        <section class="panel results" id="resultats" aria-labelledby="res-titre">
+          <h2 id="res-titre">Vos résultats</h2>
+
+          <div class="alert" id="alerte" role="alert" hidden>
+            <p>Corrigez ces valeurs pour mettre le calcul à jour&nbsp;:</p>
+            <ul id="alerte-liste"></ul>
+          </div>
+
+          <div class="res-body" id="res-body">
+            <div class="headline" aria-live="polite">
+              <p class="res-label">Dépense énergétique totale</p>
+              <p class="big"><span id="tdee">2&#8239;663</span><span class="unit">kcal par jour</span></p>
+              <p class="res-sub">dont <strong id="bmr">1&#8239;718 kcal</strong> de métabolisme de base (<span id="formule-nom">Mifflin-St Jeor</span>)</p>
+            </div>
+
+            <div class="split">
+              <div class="bar" aria-hidden="true"><span class="bar-bmr" id="bar-bmr"></span></div>
+              <div class="bar-legend">
+                <span><i class="dot dot-bmr"></i>Métabolisme de base <b id="pct-bmr">65&nbsp;%</b></span>
+                <span><i class="dot dot-act"></i>Activité et digestion <b id="pct-act">35&nbsp;%</b></span>
+              </div>
+            </div>
+
+            <div>
+              <h3>Apport conseillé selon votre objectif</h3>
+              <div class="goals">
+                <article class="goal goal-loss">
+                  <p class="goal-name">Perte de poids</p>
+                  <p class="goal-value" id="g-perte">2&#8239;163 <small>kcal/j</small></p>
+                  <p class="goal-note" id="g-perte-note">Déficit de 500 kcal, soit environ 0,5 kg par semaine</p>
+                </article>
+                <article class="goal goal-keep">
+                  <p class="goal-name">Maintien</p>
+                  <p class="goal-value" id="g-maintien">2&#8239;663 <small>kcal/j</small></p>
+                  <p class="goal-note">Votre dépense totale, pour garder un poids stable</p>
+                </article>
+                <article class="goal goal-gain">
+                  <p class="goal-name">Prise de masse</p>
+                  <p class="goal-value" id="g-prise">2&#8239;963 <small>kcal/j</small></p>
+                  <p class="goal-note">Surplus de 300 kcal, pour une prise progressive</p>
+                </article>
+              </div>
+            </div>
+
+            <a class="cta" href="#programme">
+              <span><small>Étape suivante</small><b>Trouvez le programme sportif adapté à votre objectif</b></span>
+              <span class="fleche" aria-hidden="true">→</span>
+            </a>
+
+            <div>
+              <h3>Votre dépense selon le niveau d’activité</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Niveau</th><th class="num">Coefficient</th><th class="num">kcal par jour</th></tr>
+                  </thead>
+                  <tbody id="niveaux"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <section class="method" aria-labelledby="methode-titre">
+        <h2 id="methode-titre">Comment c’est calculé</h2>
+        <p>Le calcul se fait en deux temps. On estime d’abord le métabolisme de base, l’énergie que le corps dépense au repos pour respirer, maintenir sa température et faire fonctionner ses organes. On le multiplie ensuite par un coefficient d’activité, qui ajoute l’énergie dépensée en bougeant et en digérant.</p>
+        <div class="formulas">
+          <div class="formula">
+            <h3>Mifflin-St Jeor (1990)</h3>
+            <p>La référence actuelle pour la plupart des adultes.</p>
+            <code>Homme&nbsp;: 10 × P + 6,25 × T − 5 × A + 5</code>
+            <code>Femme&nbsp;: 10 × P + 6,25 × T − 5 × A − 161</code>
+          </div>
+          <div class="formula">
+            <h3>Harris-Benedict révisée (1984)</h3>
+            <p>La formule historique de 1919, révisée par Roza et Shizgal.</p>
+            <code>Homme&nbsp;: 88,362 + 13,397 × P + 4,799 × T − 5,677 × A</code>
+            <code>Femme&nbsp;: 447,593 + 9,247 × P + 3,098 × T − 4,330 × A</code>
+          </div>
+          <div class="formula">
+            <h3>Katch-McArdle</h3>
+            <p>Fondée sur la masse maigre, donc plus précise si vous connaissez votre masse grasse.</p>
+            <code>370 + 21,6 × masse maigre (kg)</code>
+            <code>Masse maigre = P × (1 − masse grasse / 100)</code>
+          </div>
+        </div>
+        <p class="note">P&nbsp;: poids en kg. T&nbsp;: taille en cm. A&nbsp;: âge en années.</p>
+      </section>
+    </div>
+
+    <!-- =====================================================
+         PAGE 2 : PROGRAMME SPORTIF
+         ===================================================== -->
+    <div class="view" id="vue-programme" hidden>
+      <div class="intro">
+        <h1>Trouvez votre programme sportif</h1>
+        <p class="lede">Répondez à quelques questions. Le site compare vos réponses aux programmes disponibles et vous propose celui qui vous correspond le mieux.</p>
+      </div>
+
+      <div class="layout">
+        <form class="panel form" id="criteres" novalidate>
+          <div class="panel-head">
+            <h2>Vos critères</h2>
+            <p class="hint">Réponses d’exemple pré-remplies&nbsp;: modifiez-les, la recommandation se met à jour aussitôt.</p>
+          </div>
+
+          <fieldset>
+            <legend>Objectif principal</legend>
+            <div class="choices">
+              <label class="choice">
+                <input type="radio" name="objectif" id="objectif-perte" value="perte" checked>
+                <span><span class="choice-title">Perdre du poids</span><span class="choice-desc">Réduire la masse grasse</span></span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="objectif" id="objectif-maintien" value="maintien">
+                <span><span class="choice-title">Garder mon poids et être en forme</span><span class="choice-desc">Rester actif et en bonne santé</span></span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="objectif" id="objectif-prise" value="prise">
+                <span><span class="choice-title">Prendre de la masse</span><span class="choice-desc">Gagner du poids, surtout du muscle</span></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Envie de prendre du muscle</legend>
+            <div class="segmented">
+              <input type="radio" name="muscle" id="muscle-0" value="0">
+              <label for="muscle-0">Pas une priorité</label>
+              <input type="radio" name="muscle" id="muscle-1" value="1" checked>
+              <label for="muscle-1">Un peu</label>
+              <input type="radio" name="muscle" id="muscle-2" value="2">
+              <label for="muscle-2">Oui, beaucoup</label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Activités que vous aimez <span class="hint">(plusieurs choix possibles)</span></legend>
+            <div class="picks">
+              <label class="pick"><input type="checkbox" name="pref" id="pref-muscu" value="muscu" checked><span>Musculation</span></label>
+              <label class="pick"><input type="checkbox" name="pref" id="pref-course" value="course" checked><span>Course à pied</span></label>
+              <label class="pick"><input type="checkbox" name="pref" id="pref-velo" value="velo"><span>Vélo ou natation</span></label>
+              <label class="pick"><input type="checkbox" name="pref" id="pref-collectif" value="collectif"><span>Sports collectifs ou de raquette</span></label>
+              <label class="pick"><input type="checkbox" name="pref" id="pref-pdc" value="pdc"><span>Poids du corps</span></label>
+              <label class="pick"><input type="checkbox" name="pref" id="pref-douce" value="douce"><span>Yoga, pilates, marche</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Séances par semaine</legend>
+            <div class="segmented">
+              <input type="radio" name="seances" id="seances-2" value="2">
+              <label for="seances-2">2</label>
+              <input type="radio" name="seances" id="seances-3" value="3" checked>
+              <label for="seances-3">3</label>
+              <input type="radio" name="seances" id="seances-4" value="4">
+              <label for="seances-4">4</label>
+              <input type="radio" name="seances" id="seances-5" value="5">
+              <label for="seances-5">5 et plus</label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Temps disponible par séance</legend>
+            <div class="segmented">
+              <input type="radio" name="duree" id="duree-30" value="30">
+              <label for="duree-30">30 min</label>
+              <input type="radio" name="duree" id="duree-45" value="45">
+              <label for="duree-45">45 min</label>
+              <input type="radio" name="duree" id="duree-60" value="60" checked>
+              <label for="duree-60">1 h</label>
+              <input type="radio" name="duree" id="duree-75" value="75">
+              <label for="duree-75">1 h 15 et plus</label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Votre niveau</legend>
+            <div class="segmented">
+              <input type="radio" name="niveau" id="niveau-debutant" value="debutant" checked>
+              <label for="niveau-debutant">Débutant</label>
+              <input type="radio" name="niveau" id="niveau-intermediaire" value="intermediaire">
+              <label for="niveau-intermediaire">Intermédiaire</label>
+              <input type="radio" name="niveau" id="niveau-confirme" value="confirme">
+              <label for="niveau-confirme">Confirmé</label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Équipement</legend>
+            <div class="choices">
+              <label class="choice">
+                <input type="radio" name="materiel" id="materiel-salle" value="salle" checked>
+                <span><span class="choice-title">Salle de sport</span><span class="choice-desc">Machines, barres et haltères</span></span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="materiel" id="materiel-maison" value="maison">
+                <span><span class="choice-title">Un peu de matériel à la maison</span><span class="choice-desc">Haltères, banc, élastiques</span></span>
+              </label>
+              <label class="choice">
+                <input type="radio" name="materiel" id="materiel-aucun" value="aucun">
+                <span><span class="choice-title">Aucun matériel</span><span class="choice-desc">Votre poids du corps, dehors ou chez vous</span></span>
+              </label>
+            </div>
+          </fieldset>
+        </form>
+
+        <section class="panel results" id="reco" aria-labelledby="reco-titre" aria-live="polite">
+          <div class="reco-head">
+            <p class="res-label">Programme recommandé</p>
+            <span class="match" id="reco-score"></span>
+          </div>
+          <h2 class="reco-nom" id="reco-titre"></h2>
+          <p class="reco-resume" id="reco-resume"></p>
+          <ul class="facts" id="reco-faits"></ul>
+          <div id="reco-raisons-bloc">
+            <h3>Pourquoi ce programme</h3>
+            <ul class="checks" id="reco-raisons"></ul>
+          </div>
+          <div id="reco-limites-bloc">
+            <h3>Points d’attention</h3>
+            <ul class="warns" id="reco-limites"></ul>
+          </div>
+          <div>
+            <h3>Votre semaine type</h3>
+            <ol class="semaine" id="reco-semaine"></ol>
+          </div>
+          <div class="nutri" id="reco-nutri"></div>
+        </section>
+      </div>
+
+      <section class="catalogue" aria-labelledby="cat-titre">
+        <h2 id="cat-titre">Les autres programmes</h2>
+        <p class="note">Classés selon leur compatibilité avec vos critères.</p>
+        <div class="cards" id="autres"></div>
+      </section>
+    </div>
+
+    <footer>
+      <p>Estimations et programmes indicatifs pour un adulte en bonne santé, qui ne remplacent pas l’avis d’un médecin, d’un diététicien ou d’un coach. Non adaptés pendant la grossesse ou l’allaitement. Après une longue pause ou en cas de problème de santé, consultez un médecin avant de reprendre le sport.</p>
+      <p>L’apport conseillé pour perdre du poids ne descend jamais sous 1&#8239;500 kcal par jour pour un homme et 1&#8239;200 kcal pour une femme, seuils couramment retenus en l’absence de suivi médical.</p>
+      <p>Tout se calcule dans votre navigateur&nbsp;: aucune donnée n’est envoyée ni enregistrée.</p>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const $ = (id) => document.getElementById(id);
+      const entier = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
+      const coef = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 3 });
+      const kcal = (n) => entier.format(Math.round(n)) + " kcal";
+      const reduireAnimations = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      // Ce que la page 1 transmet à la page 2 : les apports conseillés
+      const etat = { calories: null };
+
+
+      /* =====================================================
+         1. NAVIGATION ENTRE LES DEUX PAGES
+         L'adresse se termine par #calculateur ou #programme.
+         ===================================================== */
+      const VUES = {
+        calculateur: { id: "vue-calculateur", titre: "Calculateur de dépense énergétique" },
+        programme:   { id: "vue-programme",   titre: "Programme sportif" }
+      };
+
+      function afficherVue() {
+        let nom = location.hash.slice(1);
+        if (!VUES[nom]) nom = "calculateur";
+        Object.keys(VUES).forEach((cle) => {
+          $(VUES[cle].id).hidden = cle !== nom;
+          const lien = $("nav-" + cle);
+          if (cle === nom) lien.setAttribute("aria-current", "page");
+          else lien.removeAttribute("aria-current");
+        });
+        document.title = VUES[nom].titre;
+        window.scrollTo(0, 0);
+      }
+
+
+      /* =====================================================
+         2. PAGE 1 : CALCULATEUR
+         ===================================================== */
+      const DEFICIT = 500;                    // kcal retirées pour la perte de poids
+      const SURPLUS = 300;                    // kcal ajoutées pour la prise de masse
+      const PLANCHER = { h: 1500, f: 1200 };  // apport minimal affiché pour la perte de poids
+      const LIMITES = {
+        age:    { min: 18,  max: 100, message: "Âge : entre 18 et 100 ans." },
+        poids:  { min: 30,  max: 300, message: "Poids : entre 30 et 300 kg." },
+        taille: { min: 120, max: 230, message: "Taille : entre 120 et 230 cm." },
+        mg:     { min: 3,   max: 60,  message: "Masse grasse : entre 3 et 60 %, ou laissez le champ vide." }
+      };
+
+      // Formules du métabolisme de base (kcal par jour)
+      const FORMULES = {
+        mifflin: {
+          nom: "Mifflin-St Jeor",
+          calcul: (v) => 10 * v.poids + 6.25 * v.taille - 5 * v.age + (v.sexe === "h" ? 5 : -161)
+        },
+        harris: {
+          nom: "Harris-Benedict révisée",
+          calcul: (v) => v.sexe === "h"
+            ? 88.362 + 13.397 * v.poids + 4.799 * v.taille - 5.677 * v.age
+            : 447.593 + 9.247 * v.poids + 3.098 * v.taille - 4.330 * v.age
+        },
+        katch: {
+          nom: "Katch-McArdle",
+          calcul: (v) => 370 + 21.6 * v.poids * (1 - v.mg / 100)
+        }
+      };
+
+      const formCalc = $("calc");
+
+      function lireNombre(id) {
+        const brut = $(id).value.trim().replace(",", ".");
+        return brut === "" ? null : Number(brut);
+      }
+
+      function marquer(id, invalide) {
+        const champ = $(id);
+        champ.setAttribute("aria-invalid", invalide ? "true" : "false");
+        champ.parentElement.classList.toggle("invalide", invalide);
+      }
+
+      function lireSaisies() {
+        const erreurs = [];
+        const v = {
+          sexe: formCalc.elements.sexe.value,
+          activite: Number(formCalc.elements.activite.value)
+        };
+        ["age", "poids", "taille"].forEach((id) => {
+          const n = lireNombre(id);
+          const l = LIMITES[id];
+          const ok = n !== null && isFinite(n) && n >= l.min && n <= l.max;
+          marquer(id, !ok);
+          if (!ok) erreurs.push(l.message);
+          v[id] = n;
+        });
+        const mg = lireNombre("mg");
+        const mgOk = mg === null || (isFinite(mg) && mg >= LIMITES.mg.min && mg <= LIMITES.mg.max);
+        marquer("mg", !mgOk);
+        if (!mgOk) erreurs.push(LIMITES.mg.message);
+        v.mg = mgOk ? mg : null;
+        return { v, erreurs };
+      }
+
+      function afficherErreurs(erreurs) {
+        const liste = $("alerte-liste");
+        liste.innerHTML = "";
+        erreurs.forEach((message) => {
+          const li = document.createElement("li");
+          li.textContent = message;
+          liste.appendChild(li);
+        });
+        $("alerte").hidden = erreurs.length === 0;
+        $("res-body").classList.toggle("perime", erreurs.length > 0);
+      }
+
+      function calculer() {
+        const { v, erreurs } = lireSaisies();
+
+        // Katch-McArdle n'est disponible qu'avec une masse grasse valide
+        const katch = $("f-katch");
+        katch.disabled = v.mg === null;
+        if (katch.disabled && katch.checked) $("f-mifflin").checked = true;
+        v.formule = formCalc.elements.formule.value;
+
+        afficherErreurs(erreurs);
+        if (erreurs.length > 0) {
+          etat.calories = null;
+          afficherNutrition();
+          return;
+        }
+
+        // Métabolisme de base selon chaque formule, affiché à côté des choix
+        Object.keys(FORMULES).forEach((cle) => {
+          $("bmr-" + cle).textContent = (cle === "katch" && v.mg === null)
+            ? "masse grasse requise"
+            : kcal(FORMULES[cle].calcul(v));
+        });
+
+        const bmr = Math.round(FORMULES[v.formule].calcul(v));
+        const tdee = Math.round(bmr * v.activite);
+
+        $("tdee").textContent = entier.format(tdee);
+        $("bmr").textContent = kcal(bmr);
+        $("formule-nom").textContent = FORMULES[v.formule].nom;
+
+        const partBmr = Math.round((bmr / tdee) * 100);
+        $("bar-bmr").style.width = partBmr + "%";
+        $("pct-bmr").textContent = partBmr + " %";
+        $("pct-act").textContent = (100 - partBmr) + " %";
+
+        // Objectifs
+        const plancher = PLANCHER[v.sexe];
+        let perte = tdee - DEFICIT;
+        const gPerte = $("g-perte");
+        const notePerte = $("g-perte-note");
+        if (tdee <= plancher) {
+          perte = null;
+          gPerte.className = "goal-value texte";
+          gPerte.textContent = "Sur avis médical";
+          notePerte.textContent = "Votre dépense est déjà proche du seuil de " + kcal(plancher) + " : parlez-en à un professionnel de santé avant de réduire vos apports.";
+        } else if (perte < plancher) {
+          perte = plancher;
+          gPerte.className = "goal-value";
+          gPerte.innerHTML = entier.format(plancher) + " <small>kcal/j</small>";
+          notePerte.textContent = "Seuil minimal appliqué. Un déficit plus fort demande un suivi médical.";
+        } else {
+          gPerte.className = "goal-value";
+          gPerte.innerHTML = entier.format(perte) + " <small>kcal/j</small>";
+          notePerte.textContent = "Déficit de " + DEFICIT + " kcal, soit environ 0,5 kg par semaine";
+        }
+        $("g-maintien").innerHTML = entier.format(tdee) + " <small>kcal/j</small>";
+        $("g-prise").innerHTML = entier.format(tdee + SURPLUS) + " <small>kcal/j</small>";
+
+        // Transmis à la page Programme
+        etat.calories = { perte: perte, maintien: tdee, prise: tdee + SURPLUS };
+        afficherNutrition();
+
+        // Tableau : dépense pour chaque niveau d'activité
+        const corps = $("niveaux");
+        corps.innerHTML = "";
+        formCalc.querySelectorAll('input[name="activite"]').forEach((radio) => {
+          const facteur = Number(radio.value);
+          const titre = radio.closest(".choice").querySelector(".choice-title").textContent;
+          const tr = document.createElement("tr");
+          if (radio.checked) tr.className = "courant";
+
+          const tdNom = document.createElement("td");
+          tdNom.textContent = titre;
+          if (radio.checked) {
+            const chip = document.createElement("span");
+            chip.className = "chip";
+            chip.textContent = "votre niveau";
+            tdNom.appendChild(chip);
+          }
+          const tdCoef = document.createElement("td");
+          tdCoef.className = "num";
+          tdCoef.textContent = "× " + coef.format(facteur);
+          const tdKcal = document.createElement("td");
+          tdKcal.className = "num";
+          tdKcal.textContent = entier.format(Math.round(bmr * facteur));
+
+          tr.append(tdNom, tdCoef, tdKcal);
+          corps.appendChild(tr);
+        });
+      }
+
+
+      /* =====================================================
+         3. PAGE 2 : PROGRAMME SPORTIF
+         ===================================================== */
+      const OBJECTIFS = {
+        perte: "la perte de poids",
+        maintien: "la forme et le maintien du poids",
+        prise: "la prise de masse"
+      };
+      const ACTIVITES = {
+        muscu: "musculation",
+        course: "course à pied",
+        velo: "vélo ou natation",
+        collectif: "sports collectifs ou de raquette",
+        pdc: "poids du corps",
+        douce: "yoga, pilates, marche"
+      };
+      const NIVEAUX = { debutant: "Débutant", intermediaire: "Intermédiaire", confirme: "Confirmé" };
+      const MATERIEL = {
+        aucun:  { rang: 0, label: "Aucun", besoin: "" },
+        maison: { rang: 1, label: "Haltères à la maison", besoin: "un peu de matériel à la maison" },
+        salle:  { rang: 2, label: "Salle de sport", besoin: "l’accès à une salle de sport" }
+      };
+      const ACCENT_MUSCLE = ["peu de renforcement musculaire", "un renforcement musculaire modéré", "un fort accent sur le muscle"];
+
+      // Le catalogue. Pour ajouter un programme, copiez un bloc et adaptez-le.
+      //   objectifs : objectifs pour lesquels il est pensé
+      //   muscle    : 0 = peu de muscle, 1 = modéré, 2 = priorité au muscle
+      //   activites : activités sur lesquelles il s'appuie
+      //   seances   : [minimum, maximum] par semaine
+      //   duree     : durée d'une séance, en minutes
+      //   materiel  : équipement minimum nécessaire
+      const PROGRAMMES = [
+        {
+          id: "recompo",
+          nom: "Musculation et cardio",
+          resume: "Renforcement musculaire et cardio dans la même semaine, pour perdre du gras tout en gardant, voire en développant, ses muscles.",
+          objectifs: ["perte", "maintien"], muscle: 1, activites: ["muscu", "course", "velo"],
+          niveaux: ["debutant", "intermediaire", "confirme"], seances: [3, 4], duree: 60, materiel: "salle",
+          semaine: [
+            ["Séance 1, musculation", "Squat, développé couché, rowing, gainage, puis 20 min de cardio modéré."],
+            ["Séance 2, fractionné", "10 min d’échauffement, puis 8 fois 30 s rapides et 90 s lentes, sur vélo, rameur ou en courant."],
+            ["Séance 3, musculation", "Soulevé de terre roumain, développé militaire, tirage vertical, fentes, puis 20 min de cardio modéré."],
+            ["Séance 4, facultative", "Footing ou vélo à allure confortable, 30 à 45 min."]
+          ]
+        },
+        {
+          id: "fullbody",
+          nom: "Full body débutant",
+          resume: "Tout le corps à chaque séance, pour apprendre les mouvements de base et gagner en force sans se blesser.",
+          objectifs: ["perte", "maintien", "prise"], muscle: 2, activites: ["muscu"],
+          niveaux: ["debutant"], seances: [2, 3], duree: 45, materiel: "maison",
+          semaine: [
+            ["Séance A", "Squat goblet, développé couché aux haltères, rowing un bras, gainage. 3 séries de 10 à 12 répétitions."],
+            ["Séance B", "Soulevé de terre roumain aux haltères, développé militaire, pompes, fentes. 3 séries de 10 à 12 répétitions."],
+            ["Rythme", "Alternez A et B, avec un jour de repos entre deux séances. Augmentez la charge quand 12 répétitions deviennent faciles."]
+          ]
+        },
+        {
+          id: "hautbas",
+          nom: "Haut et bas du corps",
+          resume: "Quatre séances qui alternent le haut et le bas du corps, pour plus de volume par muscle et une progression régulière.",
+          objectifs: ["maintien", "prise"], muscle: 2, activites: ["muscu"],
+          niveaux: ["intermediaire", "confirme"], seances: [4, 4], duree: 60, materiel: "salle",
+          semaine: [
+            ["Lundi, haut du corps", "Développé couché, rowing barre, développé militaire, tractions, biceps et triceps."],
+            ["Mardi, bas du corps", "Squat, soulevé de terre roumain, presse à cuisses, mollets, gainage."],
+            ["Jeudi, haut du corps", "Développé incliné, tirage horizontal, élévations latérales, dips."],
+            ["Vendredi, bas du corps", "Soulevé de terre, fentes bulgares, leg curl, hip thrust."]
+          ]
+        },
+        {
+          id: "ppl",
+          nom: "Push, Pull, Legs",
+          resume: "Chaque séance cible un type de mouvement : pousser, tirer, jambes. Le format des pratiquants réguliers qui veulent maximiser la prise de muscle.",
+          objectifs: ["prise", "maintien"], muscle: 2, activites: ["muscu"],
+          niveaux: ["confirme"], seances: [5, 6], duree: 75, materiel: "salle",
+          semaine: [
+            ["Push", "Pectoraux, épaules, triceps : développé couché, développé militaire, écartés, extensions."],
+            ["Pull", "Dos et biceps : tractions, rowing, tirage vertical, face pull, curls."],
+            ["Legs", "Jambes et fessiers : squat, soulevé de terre roumain, presse, leg curl, mollets."],
+            ["Rythme", "Enchaînez le cycle deux fois dans la semaine, puis un jour de repos."]
+          ]
+        },
+        {
+          id: "circuit",
+          nom: "Circuit au poids du corps",
+          resume: "Des circuits courts et intenses à faire chez soi, sans matériel, pour dépenser des calories et se renforcer.",
+          objectifs: ["perte", "maintien"], muscle: 1, activites: ["pdc"],
+          niveaux: ["debutant", "intermediaire"], seances: [3, 4], duree: 30, materiel: "aucun",
+          semaine: [
+            ["Circuit A", "Pompes, squats, fentes alternées, mountain climbers, gainage. 40 s d’effort, 20 s de repos, 4 tours."],
+            ["Circuit B", "Burpees, pont fessier, dips sur une chaise, jumping jacks, gainage latéral. Même format."],
+            ["Rythme", "Alternez A et B. Ajoutez un tour quand le circuit devient facile."]
+          ]
+        },
+        {
+          id: "endurance",
+          nom: "Endurance : course, vélo ou natation",
+          resume: "Une progression régulière en cardio pour améliorer le souffle et augmenter la dépense calorique, sans salle.",
+          objectifs: ["perte", "maintien"], muscle: 0, activites: ["course", "velo"],
+          niveaux: ["debutant", "intermediaire", "confirme"], seances: [2, 4], duree: 45, materiel: "aucun",
+          semaine: [
+            ["Séance 1, endurance", "30 à 45 min à une allure où vous pouvez parler. Débutant : alternez 2 min de course et 1 min de marche."],
+            ["Séance 2, intervalles", "Échauffement, puis 6 fois 2 min soutenues et 2 min lentes."],
+            ["Séance 3, sortie longue", "La séance la plus longue de la semaine. Allongez-la de 10 % par semaine au maximum."]
+          ]
+        },
+        {
+          id: "sport",
+          nom: "Votre sport et du renforcement",
+          resume: "Votre sport collectif ou de raquette reste la base, avec une courte séance de renforcement pour progresser et éviter les blessures.",
+          objectifs: ["perte", "maintien"], muscle: 1, activites: ["collectif"],
+          niveaux: ["debutant", "intermediaire", "confirme"], seances: [2, 4], duree: 60, materiel: "aucun",
+          semaine: [
+            ["Séances 1 et 2", "Votre sport : entraînement ou match, en club ou entre amis."],
+            ["Séance 3, renforcement", "30 min : squats, fentes, pompes, gainage, exercices d’équilibre."],
+            ["Chaque jour", "10 min de mobilité des hanches, des épaules et des chevilles."]
+          ]
+        },
+        {
+          id: "douce",
+          nom: "Remise en forme douce",
+          resume: "Pour reprendre une activité en douceur : marche active, yoga ou pilates, et un peu de mobilité.",
+          objectifs: ["perte", "maintien"], muscle: 0, activites: ["douce"],
+          niveaux: ["debutant"], seances: [2, 3], duree: 30, materiel: "aucun",
+          semaine: [
+            ["Séance 1, marche active", "30 à 45 min d’un pas soutenu, en ajoutant des côtes ou des escaliers au fil des semaines."],
+            ["Séance 2, yoga ou pilates", "30 min, en cours ou avec une vidéo guidée."],
+            ["Séance 3, mobilité", "20 min d’étirements et de mobilité, idéalement le soir."]
+          ]
+        }
+      ];
+
+      const formProg = $("criteres");
+
+      function lireCriteres() {
+        const el = formProg.elements;
+        return {
+          objectif: el.objectif.value,
+          muscle: Number(el.muscle.value),
+          activites: [...formProg.querySelectorAll('input[name="pref"]:checked')].map((c) => c.value),
+          seances: Number(el.seances.value),
+          duree: Number(el.duree.value),
+          niveau: el.niveau.value,
+          materiel: el.materiel.value
+        };
+      }
+
+      const plage = (min, max) => (min === max ? String(min) : min + " à " + max);
+
+      // Note un programme sur 100 selon les critères, avec les raisons du score
+      function evaluer(p, c) {
+        const raisons = [];
+        const limites = [];
+
+        // Équipement : critère éliminatoire
+        if (MATERIEL[p.materiel].rang > MATERIEL[c.materiel].rang) {
+          return { programme: p, score: 0, exclu: true, raisons, limites: ["Demande " + MATERIEL[p.materiel].besoin] };
+        }
+
+        let points = 0;   // sur 13
+
+        // Objectif (3 points)
+        if (p.objectifs.includes(c.objectif)) {
+          points += 3;
+          raisons.push("Pensé pour " + OBJECTIFS[c.objectif]);
+        } else {
+          limites.push("N’est pas pensé pour " + OBJECTIFS[c.objectif]);
+        }
+
+        // Envie de prendre du muscle (3 points)
+        const ecart = Math.abs(p.muscle - c.muscle);
+        points += 3 - 1.5 * ecart;
+        if (ecart === 0) raisons.push("Prévoit " + ACCENT_MUSCLE[p.muscle] + ", comme vous le souhaitez");
+        else if (p.muscle > c.muscle) limites.push("Plus axé sur le muscle que vous ne le souhaitez");
+        else limites.push("Moins axé sur le muscle que vous ne le souhaitez");
+
+        // Activités préférées (2 points)
+        const communes = p.activites.filter((a) => c.activites.includes(a));
+        if (c.activites.length === 0) {
+          points += 1;
+        } else if (communes.length > 0) {
+          points += 2;
+          raisons.push("S’appuie sur ce que vous aimez : " + communes.map((a) => ACTIVITES[a]).join(", "));
+        } else {
+          limites.push("Ne s’appuie pas sur les activités que vous préférez");
+        }
+
+        // Séances par semaine (2 points)
+        const [sMin, sMax] = p.seances;
+        if (c.seances >= sMin && c.seances <= sMax) {
+          points += 2;
+          raisons.push("Tient en " + c.seances + " séances par semaine");
+        } else if (c.seances > sMax) {
+          points += 1.5;
+          raisons.push("Demande " + plage(sMin, sMax) + " séances par semaine, moins que vos disponibilités");
+        } else {
+          limites.push("Demande au moins " + sMin + " séances par semaine, vous en prévoyez " + c.seances);
+        }
+
+        // Durée des séances (2 points)
+        const depasse = p.duree - c.duree;
+        if (depasse <= 0) {
+          points += 2;
+          raisons.push("Séances d’environ " + p.duree + " min, dans votre créneau");
+        } else if (depasse <= 15) {
+          points += 1;
+          limites.push("Séances d’environ " + p.duree + " min, un peu plus que vos " + c.duree + " min");
+        } else {
+          limites.push("Séances d’environ " + p.duree + " min, trop longues pour votre créneau de " + c.duree + " min");
+        }
+
+        // Niveau (1 point)
+        if (p.niveaux.includes(c.niveau)) {
+          points += 1;
+          raisons.push("Convient à votre niveau (" + NIVEAUX[c.niveau].toLowerCase() + ")");
+        } else {
+          limites.push("Conçu pour un niveau " + p.niveaux.map((n) => NIVEAUX[n].toLowerCase()).join(" ou "));
+        }
+
+        return { programme: p, score: Math.round((points / 13) * 100), exclu: false, raisons, limites };
+      }
+
+      // CHOIX DU PROGRAMME
+      // Aujourd'hui : des règles simples (la fonction evaluer ci-dessus).
+      // Plus tard, c'est ici que l'API Claude interviendra : on lui enverra les critères
+      // et ce classement, pour qu'elle affine le choix et personnalise le programme.
+      function choisirProgramme(criteres) {
+        return PROGRAMMES
+          .map((p) => evaluer(p, criteres))
+          .sort((a, b) => b.score - a.score);
+      }
+
+      const listeHTML = (items) => items.map((t) => "<li>" + t + "</li>").join("");
+      const semaineHTML = (p) => p.semaine.map(([titre, texte]) => "<li><b>" + titre + "</b><span>" + texte + "</span></li>").join("");
+      const faits = (p) => [
+        ["Séances", plage(p.seances[0], p.seances[1]) + " par semaine"],
+        ["Durée", "Environ " + p.duree + " min"],
+        ["Niveau", p.niveaux.map((n) => NIVEAUX[n]).join(", ")],
+        ["Matériel", MATERIEL[p.materiel].label]
+      ];
+
+      function carteHTML(r) {
+        const p = r.programme;
+        const alerte = r.exclu
+          ? "Incompatible : " + r.limites[0].charAt(0).toLowerCase() + r.limites[0].slice(1)
+          : (r.limites[0] || "");
+        return '<article class="prog-card' + (r.exclu ? " exclu" : "") + '">' +
+          '<div class="prog-top"><h3>' + p.nom + '</h3><span class="match">' + r.score + " %</span></div>" +
+          '<div class="meter" aria-hidden="true"><span style="width:' + r.score + '%"></span></div>' +
+          '<p class="prog-resume">' + p.resume + "</p>" +
+          '<p class="prog-facts">' + faits(p).map(([, v]) => v).join(" · ") + "</p>" +
+          (alerte ? '<p class="prog-limite">' + alerte + "</p>" : "") +
+          '<details><summary>Voir la semaine type</summary><ol class="semaine">' + semaineHTML(p) + "</ol></details>" +
+          "</article>";
+      }
+
+      // Le lien entre les deux pages : l'apport calorique du calculateur
+      function afficherNutrition() {
+        const bloc = $("reco-nutri");
+        const objectif = formProg.elements.objectif.value;
+        const k = etat.calories;
+        let html = '<p class="nutri-titre">Côté alimentation</p>';
+        if (!k) {
+          html += "<p>Renseignez vos informations dans le calculateur pour connaître votre apport conseillé.</p>" +
+                  '<a href="#calculateur">Ouvrir le calculateur</a>';
+        } else if (k[objectif] === null) {
+          html += "<p>Votre dépense est déjà proche du seuil minimal&nbsp;: demandez conseil à un professionnel de santé avant de réduire vos apports.</p>" +
+                  '<a href="#calculateur">Revoir le calcul</a>';
+        } else {
+          html += "<p>Pour " + OBJECTIFS[objectif] + ", visez environ <strong>" + entier.format(k[objectif]) +
+                  " kcal par jour</strong>, d’après votre calcul de dépense énergétique.</p>" +
+                  '<a href="#calculateur">Revoir le calcul</a>';
+        }
+        bloc.innerHTML = html;
+      }
+
+      function recommander() {
+        const classement = choisirProgramme(lireCriteres());
+        const meilleur = classement[0];
+        const p = meilleur.programme;
+
+        $("reco-score").textContent = meilleur.score + " % compatible";
+        $("reco-titre").textContent = p.nom;
+        $("reco-resume").textContent = p.resume;
+        $("reco-faits").innerHTML = faits(p).map(([k, v]) => "<li><span>" + k + "</span><b>" + v + "</b></li>").join("");
+        $("reco-raisons").innerHTML = listeHTML(meilleur.raisons);
+        $("reco-raisons-bloc").hidden = meilleur.raisons.length === 0;
+        $("reco-limites").innerHTML = listeHTML(meilleur.limites);
+        $("reco-limites-bloc").hidden = meilleur.limites.length === 0;
+        $("reco-semaine").innerHTML = semaineHTML(p);
+        afficherNutrition();
+
+        $("autres").innerHTML = classement.slice(1).map(carteHTML).join("");
+      }
+
+
+      /* =====================================================
+         4. DÉMARRAGE ET ÉVÉNEMENTS
+         ===================================================== */
+      formCalc.addEventListener("input", calculer);
+      formCalc.addEventListener("change", calculer);
+      formCalc.addEventListener("submit", (e) => {
+        e.preventDefault();
+        calculer();
+        // Sur mobile, les résultats sont sous le formulaire : on les fait apparaître
+        if ($("resultats").getBoundingClientRect().top > window.innerHeight * 0.6) {
+          $("resultats").scrollIntoView({ behavior: reduireAnimations ? "auto" : "smooth", block: "start" });
+        }
+      });
+
+      formProg.addEventListener("change", recommander);
+      formProg.addEventListener("submit", (e) => e.preventDefault());
+
+      window.addEventListener("hashchange", afficherVue);
+
+      calculer();
+      recommander();
+      afficherVue();
+    })();
+  </script>
+</body>
+</html>
